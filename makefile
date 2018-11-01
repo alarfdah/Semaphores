@@ -1,8 +1,8 @@
 all:
-	gcc -g -Wall *.c -lpthread -o a1
+	gcc -g -Wall a3_processes.c -lpthread -o a3_processes
 
 run: 
-	./a1
+	./a3_processes
 
 debug:
-	gdb ./a1
+	gdb ./a3_processes
