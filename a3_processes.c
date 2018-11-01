@@ -10,7 +10,7 @@
 #include <time.h>
 
 
-int getSemaphores (sem_t *screen, sem_t * keyboard, int index) {
+int get_semaphores (sem_t *screen, sem_t * keyboard, int index) {
     sem_t *first;
     sem_t *second;
 
@@ -56,14 +56,14 @@ void process (sem_t * screen, sem_t * keyboard, int index) {
     char buf[81];
     buf[80] = '\0';
     do {
-        count += getSemaphores(screen, keyboard, index);
+        count += get_semaphores(screen, keyboard, index);
         printf("enter < 80 characters or q to quit: \n");
         fgets(buf, 80, stdin);
         printf("%s\n", buf);
         sem_post(screen);
         sem_post(keyboard);
     } while (strncmp(buf, "q\n", 2) != 0);
-    count += getSemaphores(screen, keyboard, index);
+    count += get_semaphores(screen, keyboard, index);
     printf("This process: %d had %d deadlocks\n", index, count);
     sem_post(screen);
     sem_post(keyboard);

@@ -8,9 +8,11 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <pthread.h>
+#include "semaphores.h"
+#include "args.h"
 
-
-int getSemaphores (sem_t *screen, sem_t * keyboard, int index) {
+int get_semaphores(sem_t *screen, sem_t * keyboard, int index) {
     sem_t *first;
     sem_t *second;
 
@@ -49,26 +51,26 @@ int getSemaphores (sem_t *screen, sem_t * keyboard, int index) {
     return count;
 }
 
-void process (sem_t * screen, sem_t * keyboard, int index) {
-    // printf("Hello %d\n", index);
-    //   // sem_open both semaphores if necessary
+void *pthread_process(void *arguments) {
+    struct args_struct *args = arguments;
     int count = 0;
     char buf[81];
     buf[80] = '\0';
     do {
-        count += getSemaphores(screen, keyboard, index);
+        count += get_semaphores(args->sem->screen, args->sem->keyboard, args->index);
         printf("enter < 80 characters or q to quit: \n");
         fgets(buf, 80, stdin);
         printf("%s\n", buf);
-        sem_post(screen);
-        sem_post(keyboard);
+        sem_post(args->sem->screen);
+        sem_post(args->sem->keyboard);
     } while (strncmp(buf, "q\n", 2) != 0);
-    count += getSemaphores(screen, keyboard, index);
-    printf("This process: %d had %d deadlocks\n", index, count);
-    sem_post(screen);
-    sem_post(keyboard);
-    sem_close(screen);
-    sem_close(keyboard);
+    count += get_semaphores(args->sem->screen, args->sem->keyboard, args->index);
+    printf("This process: %d had %d deadlocks\n", args->index, count);
+    sem_post(args->sem->screen);
+    sem_post(args->sem->keyboard);
+    sem_close(args->sem->screen);
+    sem_close(args->sem->keyboard);
+    pthread_exit(NULL);
 }
 
 /**
@@ -76,34 +78,31 @@ void process (sem_t * screen, sem_t * keyboard, int index) {
  * Class: CS4540
  */
 int main(int argc, char **argv) {
-    sem_t *sems = sem_open("/SCREEN", O_CREAT, 0644, 1);
-    sem_t *semk = sem_open("/KEYBOARD", O_CREAT, 0644, 1);
+    pthread_t pthreads[9];
+    // pthread_t pthread;
 
-    int pids[9];
-    int pid;
     int i = 0;
-    int j = 0;
-    int *statusPtr = NULL;
-    
-    do {
-        if((pid = fork()) == 0) {
-            process(sems, semk, i);
-        } else {
-            pids[i] = pid;
-            i++;
-        }
-    } while( i < 9 && pid > 0);
 
-    if(i == 9) { // stop forking around
-        // after all die, use single call or loop based on ids saved above
-        for (j = 0; j < 9; j++) {
-            waitpid(pids[j], statusPtr, 0);
-        }
-        // sem_unlink both
-        sem_unlink("/SCREEN");
-        sem_unlink("/KEYBOARD");
+    semaphore *sem = malloc(sizeof(semaphore));
+    sem->screen = malloc(sizeof(sem_t));
+    sem->keyboard = malloc(sizeof(sem_t));
+    sem_init(sem->screen, 0, 1);
+    sem_init(sem->keyboard, 0, 1);
+
+
+    for (i = 0; i < 9; i++) {
+        struct args_struct *args = malloc(sizeof(struct args_struct));
+        args->index = i;
+        args->sem = sem;
+        pthread_create(&(pthreads[i]), NULL, pthread_process, (void *) args);
     }
 
+    for (i = 0; i < 9; i++) {
+        pthread_join(pthreads[i], NULL);
+    }
+    // sem_destroy both
+    sem_destroy(sem->screen);
+    sem_destroy(sem->keyboard);
 
     return 0;
 }
